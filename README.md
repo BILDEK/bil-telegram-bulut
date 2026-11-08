@@ -1,22 +1,21 @@
-# Bulut Telegram Asistanı (PC'den bağımsız)
+# Bulut Telegram Asistanı
 
-PC kapalıyken bile Telegram'dan mesaj atıp yanıt almanı sağlar. GitHub Actions (ücretsiz, public repo = sınırsız dakika) her 5 dakikada bir Telegram'u yoklar, mesajları **Gemini ücretsiz API** ile yanıtlar.
+GitHub Actions ücretsiz bulut botudur. PC kapalıyken **normal mesajları Gemini** yanıtlar. `/rapor` da Gemini'ye gider; yerel rapor veya gerçek zamanlı piyasa verisi değildir.
 
-## Mimari
-- `bot.py`: getUpdates → yetkili chat_id mesajlarını Gemini'ye gönder → sendMessage yanıt. Offset `offset.json`'da.
-- `.github/workflows/telegram.yml`: cron `*/5 * * * *` + workflow_dispatch. Çalışma sonunda offset'i commit'ler (hem kalıcılık hem repo'yu aktif tutar → 60 gün inaktivite kilidi olmaz).
-- Secrets (GitHub'da şifreli): `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY`. Repo public olsa da secret'lar görünmez.
+## Telegram komutları
+- `/pc` veya `/pc yardim`: yardım.
+- `/pc durum`: PC durumu (`status`).
+- `/pc rapor`: yerel rapor (`report`).
+- `/pc baglan`: geçici bağlantı (`pair`).
+- `/pc ajan <komut>`: kullanıcının verdiği komutu onayıyla yerel ajana iletir (`agent`). Proje `AGENTS.md` kuralları geçerlidir: para harcama, kişisel dosya silme, yeni açılış/oturum görevi, hesap/parola değişikliği ve credential taraması için gerekli açık onay atlanmaz.
 
-## Sınırlar / tradeoff
-- GitHub cron en sık **5 dk** → yanıt 5 dk'ya kadar gecikebilir (anlık değil). Anlık gerekirse Cloudflare Worker webhook (ücretsiz, ayrı signup).
-- PC kapalıyken bulut Gemini yanıtlar: sohbet/analiz/piyasa yorumu yapar ama **yerel PC araçlarını/ajan ordusunu çalıştıramaz**. PC açıkken tam güç yerel köprüde.
-- Çift yanıtı önlemek için: bulut devreye girince PC köprüsünün **gelen mesaj yoklaması (getUpdates) kapatılır**, sadece giden rapor/uyarı kalır.
+**PC açık ve worker çalışıyorsa** kuyruktaki iş yürütülür, sonuç Telegram'a gelir. PC fiziksel kapalıysa yerel işlem yapılamaz. İş kuyruğa alındıktan **10 dakika sonra geçersiz olur**; süresi dolan iş çalışmaz. GitHub cron `*/5` kullanır; gecikme **5 dakika veya daha uzun** olabilir, anlık erişim garantisi yoktur.
 
-## Kurulum (bir kere)
-1. `gh auth login` — PC tarayıcısında bir kere GitHub login (device flow). Telefondan değil.
-2. `deploy.ps1` çalıştır: public repo oluşturur, 3 secret'ı yerel kaynaklardan okuyup stdin ile set eder (değerler ekrana yazılmaz), push'lar, offset'i backlog ötesine ayarlar.
-3. PC köprüsünde getUpdates kapatılır (çakışma olmasın).
+## Mimari ve güvenlik
+- `bot.py`: yalnızca yetkili `chat.id` ve `from.id` eşleşen özel sohbet, bot olmayan gönderici. Diğer mesajlar işlenmez.
+- `pc_protocol.seal_job(job, key)` işleri Fernet ile doğrulanmış/şifreli zarfa dönüştürür. `pc_jobs.json` biçimi: `{"jobs":[{"id":"...","payload":"..."}]}`. Düzmetin PC komutu, bağlantı veya anahtar repo/log'a yazılmaz. Kuyruk atomik yazılır, aynı update ID yinelenmez, en fazla 50 iş tutulur (en eski budanır).
+- `.github/workflows/telegram.yml`: yalnız schedule/manual; PR tetiklemesi yok. Tek eşzamanlı çalışma, `cancel-in-progress: false`. `cryptography` kurulur; `offset.json` ve şifreli kuyruk aynı commit'te saklanır.
+- GitHub Secrets: `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`, `GEMINI_API_KEY`, **`PC_QUEUE_KEY`**. PC worker ve bulut aynı kuyruk anahtarını kullanır; anahtar repo'ya konmaz.
+- Telegram gelen mesajlarını yalnız bulut yoklar; PC köprüsü giden rapor/uyarı için kalır. Worker getUpdates kullanmaz.
 
-## Secret kaynakları (değerler hiçbir yere yazılmaz)
-- Telegram token + chat_id: `C:\Users\Viole\.config\opencode\telegram.json`
-- Gemini: User env `GEMINI_API_KEY`
+Yerel worker ayrıca çalıştırılmalıdır. Bu değişiklik yeni boot/login görevi kurmaz. Kuyruk dosyası public olsa da komut içeriği şifrelidir; ID, kuyruk boyutu ve commit zamanları görülebilir.

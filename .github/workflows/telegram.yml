@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Sifreli kuyruk bagimliligi
+        run: python -m pip install --disable-pip-version-check cryptography
       - name: Telegram mesajlarini yanitla
         run: python bot.py
         env:
@@ -28,12 +30,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.1-flash-lite' }}
-      - name: Offset kalici kaydet
+          PC_QUEUE_KEY: ${{ secrets.PC_QUEUE_KEY }}
+      - name: Offset ve sifreli kuyrugu birlikte kaydet
+        if: ${{ always() }}
         run: |
           git config user.name "telegram-bulut-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add offset.json
+          git add offset.json pc_jobs.json
           if ! git diff --cached --quiet; then
-            git commit -m "offset guncelle"
+            git commit -m "offset ve sifreli kuyruk guncelle"
             git push
           fi
