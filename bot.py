@@ -12,7 +12,8 @@ import json, os, sys, urllib.request, urllib.error
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 CHAT_ID = str(os.environ.get("TELEGRAM_CHAT_ID", ""))
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+GEMINI_FALLBACKS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"]
 OFFSET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "offset.json")
 
 SYS = (
@@ -34,20 +35,30 @@ def tg(method, **params):
     return api_call(f"https://api.telegram.org/bot{TOKEN}/{method}", params)
 
 def gemini(text):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_KEY}"
     payload = {
         "systemInstruction": {"parts": [{"text": SYS}]},
         "contents": [{"role": "user", "parts": [{"text": text}]}],
         "generationConfig": {"temperature": 0.7, "maxOutputTokens": 1024},
     }
-    try:
-        d = api_call(url, payload)
-        parts = d.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        return "".join(p.get("text", "") for p in parts).strip() or "(boş yanıt)"
-    except urllib.error.HTTPError as e:
-        return f"(Gemini hatası {e.code}; sonra tekrar dene)"
-    except Exception:
-        return "(şu an yanıt veremiyorum, sonra tekrar dene)"
+    seen = set()
+    for model in [GEMINI_MODEL] + GEMINI_FALLBACKS:
+        if model in seen:
+            continue
+        seen.add(model)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
+        try:
+            d = api_call(url, payload)
+            parts = d.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+            out = "".join(p.get("text", "") for p in parts).strip()
+            if out:
+                return out
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 503, 429):
+                continue
+            return f"(Gemini hatası {e.code}; sonra tekrar dene)"
+        except Exception:
+            continue
+    return "(şu an yanıt veremiyorum, sonra tekrar dene)"
 
 def load_offset():
     try:
