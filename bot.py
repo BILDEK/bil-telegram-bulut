@@ -18,14 +18,13 @@ GEMINI_FALLBACKS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-fl
 OFFSET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "offset.json")
 PC_JOBS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pc_jobs.json")
 PC_QUEUE_KEY = os.environ.get("PC_QUEUE_KEY", "")
+PC_QUEUE_ENABLED = os.environ.get("PC_QUEUE_ENABLED", "false").lower() == "true"
 PC_HELP = (
-    "/pc durum = PC durumu; /pc rapor = yerel rapor; /pc baglan = geçici bağlantı.\n"
-    "/pc ajan <komut> = verdiğin komutu onayınla yerel ajana iletir. "
-    "Para harcama, kişisel dosya silme, yeni açılış/oturum görevi, hesap/parola değişikliği "
-    "ve credential taraması için proje AGENTS.md onay kuralları geçerlidir.\n"
-    "PC açık ve worker çalışıyorsa sonuç gelir. PC kapalıysa yerel işlem yapılamaz; "
-    "kuyruktaki iş 10 dakika sonra geçersiz olur. GitHub cron gecikmesi 5 dakika veya daha uzun olabilir.\n"
-    "/rapor bulut Gemini sohbetidir; yerel veya canlı veri raporu değildir."
+    "Gecikmeli PC komutları güvenlik için KAPATILDI; iş kuyruğa alınmaz ve çalıştırılmaz.\n"
+    "Doğrudan ajan erişimi: PC'de KAYNAK/remote/telefon-baglan.cmd ile eşleştir; "
+    "bağlandıktan sonra GitHub kuyruğu kullanılmaz. Tam Windows ekran/fare erişimi değildir.\n"
+    "Normal bulut sohbeti devam eder, fakat GitHub zamanlaması nedeniyle gecikebilir. "
+    "/rapor bulut Gemini yanıtıdır; canlı veri raporu değildir."
 )
 
 SYS = (
@@ -33,9 +32,9 @@ SYS = (
     "Bil bir trader ve kişisel yapay-zekâ sistemi geliştiricisi; ücretsiz kaynaklara önem verir, "
     "parasız kısıtlı. OKX futures scalp trading, likidasyon avı, koşullu strateji backtest'i ile ilgilenir. "
     "Bulutta çalışıyorsun; sohbet, analiz, piyasa yorumu ve genel yardım yapabilirsin ama kendin yerel "
-    "PC araçlarını/ajan ordusunu çalıştıramazsın. /pc durum, /pc rapor, /pc baglan ve /pc ajan <komut> "
-    "şifreli iş kuyruğuna yönlenir; PC açık ve yerel worker çalışıyorsa yürütülür. /pc veya /pc yardim "
-    "yardımı gösterir. PC fiziksel kapalıysa yerel işlem yapılamaz; işler 10 dakika sonra geçersizdir. "
+    "PC araçlarını/ajan ordusunu çalıştıramazsın. Gecikmeli /pc komut kuyruğu tamamen kapatıldı; "
+    "yerel iş başlatamazsın. /pc yalnız kapatma bilgisini ve doğrudan ajan bağlantısı yardımını verir. "
+    "PC fiziksel kapalıysa yerel işlem yapılamaz. "
     "GitHub cron gecikmesi 5 dakika veya daha uzun olabilir. /rapor yalnız bulut Gemini yanıtıdır. "
     "Gerçek zamanlı veriye erişimin yoksa canlı fiyat, PC durumu veya gerçekleşmiş işlem uydurma; "
     "veri olmadığını açıkça söyle. Yerel komutu çalıştırmış gibi konuşma. "
@@ -99,6 +98,8 @@ def pc_reply(update, text):
     parts = text.split(None, 2)
     if not parts or parts[0].lower() != "/pc":
         return None
+    if not PC_QUEUE_ENABLED:
+        return PC_HELP
     command = parts[1].lower() if len(parts) > 1 else "yardim"
     if command in ("yardim", "yardım"):
         return PC_HELP
@@ -192,7 +193,7 @@ def main():
             if text in ("/start", "/durum"):
                 reply = (
                     "Bulut asistan aktif (PC kapalıyken de çalışır). Normal mesajlar Gemini'ye gider. "
-                    "/pc = yerel PC komutları; /rapor = bulut Gemini, canlı veri raporu değil."
+                    "Gecikmeli PC komutları kapalı; /pc = doğrudan bağlantı yardımı. /rapor canlı veri değil."
                 )
             else:
                 reply = gemini(text) if GEMINI_KEY else "Gemini yapılandırılmamış; /pc yardımını kullanabilirsin."

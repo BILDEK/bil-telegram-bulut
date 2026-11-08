@@ -30,7 +30,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.1-flash-lite' }}
-          PC_QUEUE_KEY: ${{ secrets.PC_QUEUE_KEY }}
+          PC_QUEUE_ENABLED: 'false'
       - name: Offset ve sifreli kuyrugu birlikte kaydet
         if: ${{ always() }}
         run: |

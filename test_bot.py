@@ -20,7 +20,8 @@ class CloudRoutingTests(unittest.TestCase):
         self.now = int(time.time())
         self.key = Fernet.generate_key()
         self.patches = patch.multiple(bot, CHAT_ID="42", TOKEN="FAKE-NOT-REAL", GEMINI_KEY="fake",
-                                     PC_QUEUE_KEY=self.key, PC_JOBS_FILE=str(self.base / "jobs.json"),
+                                     PC_QUEUE_KEY=self.key, PC_QUEUE_ENABLED=True,
+                                     PC_JOBS_FILE=str(self.base / "jobs.json"),
                                      OFFSET_FILE=str(self.base / "offset.json"))
         self.patches.start()
         self.addCleanup(self.patches.stop)
@@ -32,6 +33,13 @@ class CloudRoutingTests(unittest.TestCase):
 
     def queue(self):
         return json.loads((self.base / "jobs.json").read_text())["jobs"]
+
+    def test_disabled_rejects_all_commands_without_queue_or_gemini(self):
+        with patch.object(bot, "PC_QUEUE_ENABLED", False), patch.object(bot, "enqueue_pc_job") as enqueue:
+            for text in ("/pc", "/pc durum", "/pc baglan", "/pc ajan tehlikeli-eski-is"):
+                self.assertIn("KAPATILDI", bot.pc_reply(self.update(text), text))
+            enqueue.assert_not_called()
+        self.assertFalse((self.base / "jobs.json").exists())
 
     def test_status_encrypted(self):
         bot.pc_reply(self.update("/pc durum"), "/pc durum")
